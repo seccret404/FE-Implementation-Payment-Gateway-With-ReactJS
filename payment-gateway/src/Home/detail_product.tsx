@@ -4,24 +4,26 @@ import { FiArrowLeft, FiShoppingCart, FiStar, FiPlus, FiMinus, FiLoader } from '
 import { motion } from 'framer-motion';
 import { toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
+
 interface Product {
-  id: number;
-  title: string;
-  price: number;
-  description: string;
-  category: string;
-  image: string;
-  rating: {
-    rate: number;
-    count: number;
-  };
+     id: number;
+     title: string;
+     price: number;
+     description: string;
+     category: string;
+     image: string;
+     rating: {
+          rate: number;
+          count: number;
+     };
 }
+
 export default function DetailProduct() {
      const { id } = useParams();
      const navigate = useNavigate();
-     const [product, setProduct] = useState<Product[]>([]);
+     const [product, setProduct] = useState<Product | null>(null);
      const [loading, setLoading] = useState(true);
-     const [error, setError] = useState(null);
+     const [error, setError] = useState<string | null>(null);
      const [quantity, setQuantity] = useState(1);
      const [addingToCart, setAddingToCart] = useState(false);
 
@@ -41,8 +43,8 @@ export default function DetailProduct() {
                     const data = await response.json();
                     setProduct(data);
                } catch (err) {
-                    setError(error);
-                    toast.error(error);
+                    setError(err instanceof Error ? err.message : 'An unknown error occurred');
+                    toast.error(err instanceof Error ? err.message : 'An unknown error occurred');
                } finally {
                     setLoading(false);
                }
@@ -51,12 +53,34 @@ export default function DetailProduct() {
           fetchProduct();
      }, [id]);
 
-     const handleAddToCart = () => {
-          setAddingToCart(true);
+     const handleAddToCart = async () => {
+          if (!product) return;
 
-          // Simulate API call to add to cart
-          setTimeout(() => {
-               toast.success(`${quantity} ${product.title} added to cart!`, {
+          setAddingToCart(true);
+          try {
+               const response = await fetch('http://localhost:3000/api/payment', {
+                    method: 'POST',
+                    headers: {
+                         'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                         product_id: product.id,
+                         customer_name: "John Doe", // Replace with actual user data
+                         customer_email: "john@example.com", // Replace with actual user data
+                         quantity,
+                         price: product.price,
+                    }),
+               });
+
+               if (!response.ok) {
+                    throw new Error('Failed to create payment');
+               }
+
+               const data = await response.json();
+               window.location.href = data.snap_url; // Redirect to Midtrans payment page
+
+          } catch (err) {
+               toast.error(`Payment failed: ${err instanceof Error ? err.message : 'Unknown error'}`, {
                     position: "top-right",
                     autoClose: 3000,
                     hideProgressBar: false,
@@ -64,8 +88,9 @@ export default function DetailProduct() {
                     pauseOnHover: true,
                     draggable: true,
                });
+          } finally {
                setAddingToCart(false);
-          }, 1000);
+          }
      };
 
      const incrementQuantity = () => {
@@ -113,6 +138,10 @@ export default function DetailProduct() {
                     </motion.div>
                </div>
           );
+     }
+
+     if (!product) {
+          return null; // or some fallback UI
      }
 
      return (
@@ -197,7 +226,7 @@ export default function DetailProduct() {
                                         </div>
                                    </div>
 
-                                   {/* Add to Cart Button */}
+                                   {/* Checkout Button */}
                                    <motion.button
                                         whileHover={{ scale: 1.02 }}
                                         whileTap={{ scale: 0.98 }}
@@ -214,11 +243,11 @@ export default function DetailProduct() {
                                                   >
                                                        <FiLoader />
                                                   </motion.span>
-                                                  Adding...
+                                                  Processing...
                                              </>
                                         ) : (
                                              <>
-                                                  <FiShoppingCart /> Add to Cart (${(product.price * quantity).toFixed(2)})
+                                                  <FiShoppingCart /> Checkout (${(product.price * quantity).toFixed(2)})
                                              </>
                                         )}
                                    </motion.button>
@@ -239,17 +268,6 @@ export default function DetailProduct() {
                               </div>
                          </div>
                     </motion.div>
-
-                    {/* Related Products (Optional) */}
-                    <div className="mt-16">
-                         <h2 className="text-2xl font-bold text-[#0D9276] mb-6">You might also like</h2>
-                         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                              {/* You would fetch related products here */}
-                              <div className="bg-white p-4 rounded-lg shadow-md text-center">
-                                   <div className="text-gray-500 text-sm">More products coming soon</div>
-                              </div>
-                         </div>
-                    </div>
                </div>
           </div>
      );
